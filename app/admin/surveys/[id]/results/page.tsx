@@ -1,0 +1,335 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+import { Survey, Response } from '@/lib/types/survey'
+import { Download, ArrowLeft, Users } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import * as XLSX from 'xlsx'
+import Papa from 'papaparse'
+
+export default function SurveyResultsPage() {
+  const params = useParams()
+  const surveyId = params.id as string
+
+  const [survey, setSurvey] = useState<Survey | null>(null)
+  const [responses, setResponses] = useState<Response[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const supabase = createClient()
+
+        // Fetch survey
+        const { data: surveyData, error: surveyError } = await supabase
+          .from('surveys')
+          .select('*')
+          .eq('id', surveyId)
+          .single()
+
+        if (surveyError) throw surveyError
+
+        // Fetch responses
+        const { data: responsesData, error: responsesError } = await supabase
+          .from('responses')
+          .select('*')
+          .eq('survey_id', surveyId)
+          .order('created_at', { ascending: false })
+
+        if (responsesError) throw responsesError
+
+        setSurvey(surveyData as Survey)
+        setResponses(responsesData as Response[])
+      } catch (err: any) {
+        setError(err.message || '데이터를 불러오는데 실패했습니다.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+
+    // 실시간 업데이트를 위한 polling (5초마다)
+    const interval = setInterval(fetchData, 5000)
+    return () => clearInterval(interval)
+  }, [surveyId])
+
+  const calculateStatistics = (sectionId: string, questionId: string) => {
+    const values = responses
+      .map((r) => r.section_answers[sectionId]?.[questionId])
+      .filter((v) => v !== undefined && v !== null && v > 0)
+
+    if (values.length === 0) {
+      return {
+        average: 0,
+        distribution: [0, 0, 0, 0, 0],
+        count: 0,
+      }
+    }
+
+    const sum = values.reduce((acc, val) => acc + val, 0)
+    const average = sum / values.length
+
+    const distribution = [0, 0, 0, 0, 0]
+    values.forEach((val) => {
+      if (val >= 1 && val <= 5) {
+        distribution[val - 1]++
+      }
+    })
+
+    return {
+      average: Math.round(average * 100) / 100,
+      distribution,
+      count: values.length,
+    }
+  }
+
+  const exportToExcel = () => {
+    if (!survey || responses.length === 0) return
+
+    const data: any[] = []
+
+    responses.forEach((response, index) => {
+      const row: any = {
+        '번호': index + 1,
+        '제출일시': new Date(response.created_at).toLocaleString('ko-KR'),
+        '이름': response.basic_info.name,
+        '부서': response.basic_info.department,
+        '연령': response.basic_info.age,
+        '경력': response.basic_info.career,
+      }
+
+      survey.sections.forEach((section) => {
+        section.questions.forEach((question) => {
+          row[`${section.title} - ${question.text}`] =
+            response.section_answers[section.id]?.[question.id] || ''
+        })
+      })
+
+      data.push(row)
+    })
+
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '응답 결과')
+
+    XLSX.writeFile(wb, `${survey.title}_결과.xlsx`)
+  }
+
+  const exportToCSV = () => {
+    if (!survey || responses.length === 0) return
+
+    const data: any[] = []
+
+    responses.forEach((response, index) => {
+      const row: any = {
+        '번호': index + 1,
+        '제출일시': new Date(response.created_at).toLocaleString('ko-KR'),
+        '이름': response.basic_info.name,
+        '부서': response.basic_info.department,
+        '연령': response.basic_info.age,
+        '경력': response.basic_info.career,
+      }
+
+      survey.sections.forEach((section) => {
+        section.questions.forEach((question) => {
+          row[`${section.title} - ${question.text}`] =
+            response.section_answers[section.id]?.[question.id] || ''
+        })
+      })
+
+      data.push(row)
+    })
+
+    const csv = Papa.unparse(data)
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `${survey.title}_결과.csv`
+    link.click()
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
+
+  if (error || !survey) {
+    return (
+      <div className="px-4 sm:px-0">
+        <p className="text-red-600">{error || '설문을 찾을 수 없습니다.'}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-4 sm:px-0">
+      {/* 헤더 */}
+      <div className="mb-6">
+        <Link
+          href="/admin"
+          className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800 mb-4"
+        >
+          <ArrowLeft size={16} />
+          목록으로 돌아가기
+        </Link>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{survey.title}</h1>
+            <p className="mt-1 text-sm text-gray-600">설문 결과</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={exportToExcel}
+              disabled={responses.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download size={16} />
+              엑셀 다운로드
+            </button>
+            <button
+              onClick={exportToCSV}
+              disabled={responses.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download size={16} />
+              CSV 다운로드
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 통계 요약 */}
+      <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <div className="flex items-center gap-3">
+          <Users className="text-indigo-600" size={24} />
+          <div>
+            <p className="text-sm text-gray-600">총 응답 수</p>
+            <p className="text-2xl font-bold text-gray-900">{responses.length}명</p>
+          </div>
+        </div>
+      </div>
+
+      {responses.length === 0 ? (
+        <div className="bg-white shadow rounded-lg p-8 text-center">
+          <p className="text-gray-500">아직 응답이 없습니다.</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* 기본 정보 응답 */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">기본 정보 응답</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      번호
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      이름
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      부서
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      연령
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      경력
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      제출일시
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {responses.map((response, index) => (
+                    <tr key={response.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {response.basic_info.name}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {response.basic_info.department}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {response.basic_info.age}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {response.basic_info.career}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {new Date(response.created_at).toLocaleString('ko-KR')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 섹션별 통계 */}
+          {survey.sections.map((section) => (
+            <div key={section.id} className="bg-white shadow rounded-lg p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">{section.title}</h2>
+              <div className="space-y-8">
+                {section.questions.map((question) => {
+                  const stats = calculateStatistics(section.id, question.id)
+                  const chartData = [
+                    { score: '1점', count: stats.distribution[0] },
+                    { score: '2점', count: stats.distribution[1] },
+                    { score: '3점', count: stats.distribution[2] },
+                    { score: '4점', count: stats.distribution[3] },
+                    { score: '5점', count: stats.distribution[4] },
+                  ]
+
+                  return (
+                    <div key={question.id} className="border-b border-gray-200 pb-6 last:border-b-0">
+                      <div className="mb-4">
+                        <h3 className="text-sm font-medium text-gray-900 mb-2">
+                          {question.text}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          평균: <span className="font-bold text-indigo-600">{stats.average}</span>점
+                          (총 {stats.count}명 응답)
+                        </p>
+                      </div>
+
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="score" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="count" fill="#4F46E5" name="응답 수" />
+                        </BarChart>
+                      </ResponsiveContainer>
+
+                      <div className="mt-4 grid grid-cols-5 gap-2 text-center text-sm">
+                        {stats.distribution.map((count, index) => (
+                          <div key={index} className="bg-gray-50 rounded p-2">
+                            <p className="font-medium text-gray-900">{index + 1}점</p>
+                            <p className="text-gray-600">{count}명</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

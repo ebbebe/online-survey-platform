@@ -1,0 +1,387 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Survey, BasicInfoAnswer, SectionAnswers } from '@/lib/types/survey'
+import { CheckCircle2 } from 'lucide-react'
+
+export default function SurveyResponsePage() {
+  const params = useParams()
+  const router = useRouter()
+  const surveyId = params.id as string
+
+  const [survey, setSurvey] = useState<Survey | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+
+  // 기본 정보 답변
+  const [basicInfo, setBasicInfo] = useState<BasicInfoAnswer>({
+    name: '',
+    department: '',
+    age: '',
+    career: '',
+  })
+
+  // 섹션별 답변
+  const [sectionAnswers, setSectionAnswers] = useState<SectionAnswers>({})
+
+  // 진행률 계산
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    async function fetchSurvey() {
+      try {
+        const supabase = createClient()
+        const { data, error: fetchError } = await supabase
+          .from('surveys')
+          .select('*')
+          .eq('id', surveyId)
+          .single()
+
+        if (fetchError) throw fetchError
+
+        setSurvey(data as Survey)
+
+        // 섹션별 답변 초기화
+        const initialAnswers: SectionAnswers = {}
+        data.sections.forEach((section: any) => {
+          initialAnswers[section.id] = {}
+          section.questions.forEach((question: any) => {
+            initialAnswers[section.id][question.id] = 0
+          })
+        })
+        setSectionAnswers(initialAnswers)
+      } catch (err: any) {
+        setError(err.message || '설문을 불러오는데 실패했습니다.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSurvey()
+  }, [surveyId])
+
+  // 진행률 계산
+  useEffect(() => {
+    if (!survey) return
+
+    const totalFields = 4 + survey.sections.reduce(
+      (acc, section) => acc + section.questions.length,
+      0
+    )
+
+    let filledFields = 0
+
+    // 기본 정보
+    if (basicInfo.name) filledFields++
+    if (basicInfo.department) filledFields++
+    if (basicInfo.age) filledFields++
+    if (basicInfo.career) filledFields++
+
+    // 섹션 답변
+    survey.sections.forEach((section) => {
+      section.questions.forEach((question) => {
+        if (sectionAnswers[section.id]?.[question.id] > 0) {
+          filledFields++
+        }
+      })
+    })
+
+    setProgress(Math.round((filledFields / totalFields) * 100))
+  }, [basicInfo, sectionAnswers, survey])
+
+  const updateAnswer = (sectionId: string, questionId: string, value: number) => {
+    const section = survey?.sections.find((s) => s.id === sectionId)
+    if (!section) return
+
+    const currentAnswers = sectionAnswers[sectionId] || {}
+    const oldValue = currentAnswers[questionId] || 0
+
+    // 5점을 선택한 문항 수 계산
+    const fivePointCount = Object.values(currentAnswers).filter((v) => v === 5).length
+
+    // 5점으로 변경하려고 할 때
+    if (value === 5 && oldValue !== 5) {
+      if (fivePointCount >= section.max_five_points) {
+        setError(
+          `이 섹션에서는 최대 ${section.max_five_points}개의 문항에만 5점을 선택할 수 있습니다.`
+        )
+        setTimeout(() => setError(''), 3000)
+        return
+      }
+    }
+
+    setSectionAnswers({
+      ...sectionAnswers,
+      [sectionId]: {
+        ...currentAnswers,
+        [questionId]: value,
+      },
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+
+    // 유효성 검사
+    if (!basicInfo.name.trim()) {
+      setError('이름을 입력해주세요.')
+      return
+    }
+    if (!basicInfo.department.trim()) {
+      setError('부서를 입력해주세요.')
+      return
+    }
+    if (!basicInfo.age.trim()) {
+      setError('연령을 입력해주세요.')
+      return
+    }
+    if (!basicInfo.career.trim()) {
+      setError('경력을 입력해주세요.')
+      return
+    }
+
+    // 모든 문항 응답 확인
+    for (const section of survey!.sections) {
+      for (const question of section.questions) {
+        if (!sectionAnswers[section.id]?.[question.id] || sectionAnswers[section.id][question.id] === 0) {
+          setError('모든 문항에 응답해주세요.')
+          return
+        }
+      }
+    }
+
+    setSubmitting(true)
+
+    try {
+      const supabase = createClient()
+      const { error: insertError } = await supabase.from('responses').insert({
+        survey_id: surveyId,
+        basic_info: basicInfo,
+        section_answers: sectionAnswers,
+      })
+
+      if (insertError) throw insertError
+
+      setSubmitted(true)
+    } catch (err: any) {
+      setError(err.message || '응답 제출에 실패했습니다.')
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">설문을 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!survey) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <p className="text-red-600">설문을 찾을 수 없습니다.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full bg-white shadow rounded-lg p-8 text-center">
+          <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">제출 완료</h2>
+          <p className="text-gray-600">설문에 응답해 주셔서 감사합니다.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* 진행률 표시 */}
+        <div className="mb-6">
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">진행률</span>
+              <span className="text-sm font-medium text-indigo-600">{progress}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 설문 제목 */}
+        <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{survey.title}</h1>
+          {survey.description && (
+            <p className="text-gray-600">{survey.description}</p>
+          )}
+          <p className="mt-4 text-sm text-red-600">* 모든 항목은 필수 응답입니다.</p>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* 기본 정보 */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">기본 정보</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  1. 귀하의 이름은? *
+                </label>
+                <input
+                  type="text"
+                  value={basicInfo.name}
+                  onChange={(e) =>
+                    setBasicInfo({ ...basicInfo, name: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="이름을 입력하세요"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  2. 귀하의 부서는? *
+                </label>
+                <input
+                  type="text"
+                  value={basicInfo.department}
+                  onChange={(e) =>
+                    setBasicInfo({ ...basicInfo, department: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="부서를 입력하세요"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  3. 귀하의 연령은? *
+                </label>
+                <input
+                  type="text"
+                  value={basicInfo.age}
+                  onChange={(e) =>
+                    setBasicInfo({ ...basicInfo, age: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="예: 30대"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  4. 귀하의 총 직장 경력기간은? *
+                </label>
+                <input
+                  type="text"
+                  value={basicInfo.career}
+                  onChange={(e) =>
+                    setBasicInfo({ ...basicInfo, career: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="예: 5년 이하"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 척도 문항 섹션 */}
+          {survey.sections.map((section, sectionIndex) => {
+            const fivePointCount = Object.values(sectionAnswers[section.id] || {}).filter(
+              (v) => v === 5
+            ).length
+
+            return (
+              <div key={section.id} className="bg-white shadow rounded-lg p-6">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold text-gray-900">{section.title}</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    이 섹션에서는 최대 {section.max_five_points}개의 문항에만 5점을 선택할
+                    수 있습니다.
+                    {section.max_five_points > 0 && (
+                      <span className="ml-2 text-indigo-600 font-medium">
+                        (현재 {fivePointCount}/{section.max_five_points})
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="space-y-6">
+                  {section.questions.map((question, questionIndex) => {
+                    const value = sectionAnswers[section.id]?.[question.id] || 0
+
+                    return (
+                      <div key={question.id} className="pb-4 border-b border-gray-200 last:border-b-0">
+                        <p className="text-sm font-medium text-gray-900 mb-3">
+                          {questionIndex + 1}. {question.text} *
+                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-gray-500 w-16 text-center">
+                            매우<br/>그렇지 않다
+                          </span>
+                          <div className="flex gap-2 flex-1 justify-center">
+                            {[1, 2, 3, 4, 5].map((score) => (
+                              <button
+                                key={score}
+                                type="button"
+                                onClick={() => updateAnswer(section.id, question.id, score)}
+                                className={`w-12 h-12 rounded-full border-2 transition-all ${
+                                  value === score
+                                    ? 'bg-indigo-600 border-indigo-600 text-white scale-110'
+                                    : 'bg-white border-gray-300 text-gray-700 hover:border-indigo-400'
+                                }`}
+                              >
+                                {score}
+                              </button>
+                            ))}
+                          </div>
+                          <span className="text-xs text-gray-500 w-16 text-center">
+                            매우<br/>그렇다
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+
+          {/* 제출 버튼 */}
+          <div className="sticky bottom-0 bg-white shadow-lg rounded-lg p-6">
+            <button
+              type="submit"
+              disabled={submitting || progress < 100}
+              className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? '제출 중...' : progress < 100 ? '모든 항목을 작성해주세요' : '제출하기'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

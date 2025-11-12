@@ -1,36 +1,164 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 온라인 설문 플랫폼
 
-## Getting Started
+구글폼과 유사한 기능을 제공하는 온라인 설문 조사 플랫폼입니다.
 
-First, run the development server:
+## 주요 기능
+
+### 🎯 설문 관리
+- 설문 생성, 수정, 삭제
+- 섹션 및 문항 유동적 구성
+- 고유 URL을 통한 설문 공유
+
+### 📝 응답 수집
+- 기본 정보 수집 (이름, 부서, 연령, 경력)
+- 1-5점 척도 문항
+- 섹션별 5점 선택 제약 (최대 N개)
+- 실시간 진행률 표시
+- 모든 문항 필수 응답
+
+### 📊 결과 분석
+- 총 응답 수 통계
+- 기본 정보 응답 목록
+- 척도 문항별 통계 (평균, 분포)
+- 차트를 통한 시각화
+- 실시간 자동 업데이트 (5초마다)
+- 엑셀/CSV 다운로드
+
+### 🔐 관리자 인증
+- 이메일/비밀번호 로그인
+- 설문 생성/수정/삭제 권한
+- 결과 조회 권한
+
+## 기술 스택
+
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript
+- **Styling**: Tailwind CSS 4
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
+- **Charts**: Recharts
+- **Data Export**: xlsx, papaparse
+- **Icons**: Lucide React
+
+## 시작하기
+
+### 1. 환경 변수 설정
+
+`.env.local` 파일을 생성하고 Supabase 프로젝트 정보를 입력하세요:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+### 2. 의존성 설치
+
+```bash
+npm install
+```
+
+### 3. 개발 서버 실행
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 확인하세요.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 프로젝트 구조
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+.
+├── app/
+│   ├── admin/                  # 관리자 페이지
+│   │   ├── surveys/
+│   │   │   ├── create/        # 설문 생성
+│   │   │   └── [id]/
+│   │   │       └── results/   # 결과 조회
+│   │   ├── layout.tsx         # 관리자 레이아웃 (인증 확인)
+│   │   ├── page.tsx           # 설문 목록
+│   │   ├── actions.ts         # 서버 액션 (삭제)
+│   │   └── survey-list.tsx    # 설문 목록 컴포넌트
+│   ├── login/                 # 로그인 페이지
+│   │   ├── page.tsx
+│   │   └── actions.ts         # 인증 액션
+│   ├── surveys/
+│   │   └── [id]/              # 설문 응답 페이지 (공개)
+│   ├── api/
+│   │   └── surveys/[id]/      # 설문 API 라우트
+│   ├── layout.tsx             # 루트 레이아웃
+│   └── page.tsx               # 홈페이지
+├── lib/
+│   ├── supabase/              # Supabase 클라이언트
+│   │   ├── client.ts          # 브라우저 클라이언트
+│   │   ├── server.ts          # 서버 클라이언트
+│   │   └── middleware.ts      # 미들웨어 헬퍼
+│   └── types/                 # TypeScript 타입 정의
+│       ├── database.types.ts  # Supabase 타입
+│       └── survey.ts          # 설문 타입
+├── middleware.ts              # Next.js 미들웨어 (인증)
+└── .env.local.example         # 환경 변수 예제
+```
 
-## Learn More
+## 데이터베이스 스키마
 
-To learn more about Next.js, take a look at the following resources:
+### surveys 테이블
+- `id` (uuid, PK)
+- `title` (text) - 설문 제목
+- `description` (text) - 설문 설명
+- `sections` (jsonb) - 섹션 및 문항 정보
+- `created_at` (timestamptz)
+- `updated_at` (timestamptz)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### responses 테이블
+- `id` (uuid, PK)
+- `survey_id` (uuid, FK)
+- `basic_info` (jsonb) - 기본 정보 답변
+- `section_answers` (jsonb) - 섹션별 답변
+- `created_at` (timestamptz)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 사용 방법
 
-## Deploy on Vercel
+### 1. 관리자 계정 생성
+1. `/login` 페이지로 이동
+2. "계정이 없으신가요? 회원가입" 클릭
+3. 이메일과 비밀번호 입력하여 계정 생성
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 2. 설문 생성
+1. 관리자 페이지에서 "새 설문 만들기" 클릭
+2. 설문 제목 및 설명 입력
+3. 섹션 추가 및 문항 작성
+4. 각 섹션의 5점 선택 최대 개수 설정
+5. "설문 생성" 버튼 클릭
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 3. 설문 공유
+1. 설문 목록에서 "보기" 버튼 클릭
+2. URL 복사하여 응답자에게 공유
+
+### 4. 결과 확인
+1. 설문 목록에서 "결과" 버튼 클릭
+2. 통계 및 차트 확인
+3. 필요시 엑셀/CSV로 다운로드
+
+## 주요 기능 상세
+
+### 5점 선택 제약 로직
+- 각 섹션마다 5점을 선택할 수 있는 최대 문항 수를 설정 가능
+- 제한을 초과하면 경고 메시지 표시 및 선택 차단
+- 실시간으로 현재 5점 선택 개수 표시
+
+### 실시간 업데이트
+- 결과 조회 페이지에서 5초마다 자동으로 데이터 갱신
+- 새로운 응답이 제출되면 자동으로 통계에 반영
+
+### 진행률 표시
+- 응답 페이지에서 실시간으로 진행률 계산
+- 기본 정보 + 모든 척도 문항을 기준으로 계산
+- 시각적인 프로그레스 바로 표시
+
+## 라이선스
+
+MIT
+
+## 개발자
+
+온라인 설문 플랫폼 개발팀
