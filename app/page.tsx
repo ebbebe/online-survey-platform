@@ -1,53 +1,108 @@
-import Link from 'next/link'
-import { ClipboardList } from 'lucide-react'
+'use client'
 
-export default function Home() {
+import { useState } from 'react'
+import { login, signup } from '@/app/login/actions'
+
+export default function LoginPage() {
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [error, setError] = useState<string>('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    setLoading(true)
+
+    const formData = new FormData(event.currentTarget)
+
+    try {
+      const result = isSignUp ? await signup(formData) : await login(formData)
+      if (result?.error) {
+        setError(result.error)
+      }
+    } catch (err) {
+      setError('예상치 못한 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-      <div className="max-w-3xl mx-auto px-4 text-center">
-        <div className="mb-8">
-          <ClipboardList className="w-20 h-20 text-indigo-600 mx-auto mb-4" />
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            온라인 설문 플랫폼
-          </h1>
-          <p className="text-lg text-gray-600 mb-8">
-            간편하게 설문을 만들고, 응답을 수집하고, 결과를 분석하세요.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/admin"
-            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
-          >
-            관리자 페이지
-          </Link>
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-          >
-            로그인
-          </Link>
-        </div>
-
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="p-6 bg-white rounded-lg shadow-sm">
-            <div className="text-indigo-600 font-semibold mb-2">1. 설문 생성</div>
-            <p className="text-sm text-gray-600">
-              섹션과 문항을 자유롭게 구성하여 설문을 만드세요.
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* 헤더 */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent mb-2">
+              설문 관리 시스템
+            </h1>
+            <p className="text-sm text-gray-500">
+              {isSignUp ? '새 계정을 만들어주세요' : '로그인하여 시작하세요'}
             </p>
           </div>
-          <div className="p-6 bg-white rounded-lg shadow-sm">
-            <div className="text-indigo-600 font-semibold mb-2">2. 응답 수집</div>
-            <p className="text-sm text-gray-600">
-              고유 URL을 공유하여 응답을 수집하세요.
-            </p>
-          </div>
-          <div className="p-6 bg-white rounded-lg shadow-sm">
-            <div className="text-indigo-600 font-semibold mb-2">3. 결과 분석</div>
-            <p className="text-sm text-gray-600">
-              실시간으로 통계를 확인하고 엑셀로 다운로드하세요.
-            </p>
+
+          {/* 로그인 폼 */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                이메일
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                placeholder="your@email.com"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                비밀번호
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                placeholder="••••••••"
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 px-4 bg-gradient-to-r from-gray-900 to-gray-700 text-white font-medium rounded-lg hover:from-gray-800 hover:to-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-gray-900/25 hover:shadow-xl hover:shadow-gray-900/30"
+            >
+              {loading ? '처리 중...' : isSignUp ? '계정 생성' : '로그인'}
+            </button>
+          </form>
+
+          {/* 토글 */}
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp)
+                setError('')
+              }}
+              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              {isSignUp ? '이미 계정이 있으신가요? ' : '계정이 없으신가요? '}
+              <span className="font-medium text-gray-900">
+                {isSignUp ? '로그인' : '회원가입'}
+              </span>
+            </button>
           </div>
         </div>
       </div>
