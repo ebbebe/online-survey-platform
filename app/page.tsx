@@ -1,10 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { login, signup } from '@/app/login/actions'
+import { login } from '@/app/login/actions'
 
 export default function LoginPage() {
-  const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
@@ -16,7 +15,7 @@ export default function LoginPage() {
     const formData = new FormData(event.currentTarget)
 
     try {
-      const result = isSignUp ? await signup(formData) : await login(formData)
+      const result = await login(formData)
       if (result?.error) {
         setError(result.error)
       }
@@ -41,7 +40,7 @@ export default function LoginPage() {
               설문 관리 시스템
             </h1>
             <p className="text-sm text-gray-500">
-              {isSignUp ? '새 계정을 만들어주세요' : '로그인하여 시작하세요'}
+              로그인하여 시작하세요
             </p>
           </div>
 
@@ -88,26 +87,9 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full py-3 px-4 bg-gradient-to-r from-gray-900 to-gray-700 text-white font-medium rounded-lg hover:from-gray-800 hover:to-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-gray-900/25 hover:shadow-xl hover:shadow-gray-900/30"
             >
-              {loading ? '처리 중...' : isSignUp ? '계정 생성' : '로그인'}
+              {loading ? '처리 중...' : '로그인'}
             </button>
           </form>
-
-          {/* 토글 */}
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp)
-                setError('')
-              }}
-              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              {isSignUp ? '이미 계정이 있으신가요? ' : '계정이 없으신가요? '}
-              <span className="font-medium text-gray-900">
-                {isSignUp ? '로그인' : '회원가입'}
-              </span>
-            </button>
-          </div>
         </div>
       </div>
     </div>
