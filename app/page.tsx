@@ -20,7 +20,11 @@ export default function LoginPage() {
       if (result?.error) {
         setError(result.error)
       }
-    } catch (err) {
+    } catch (err: any) {
+      // redirect()의 특수 에러는 정상 동작이므로 다시 throw
+      if (err?.digest?.includes('NEXT_REDIRECT')) {
+        throw err
+      }
       setError('예상치 못한 오류가 발생했습니다.')
     } finally {
       setLoading(false)
