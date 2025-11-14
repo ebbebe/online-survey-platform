@@ -1,27 +1,64 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Plus, Trash2, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import { Plus, Trash2, X, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { SurveySection, SurveyQuestion } from '@/lib/types/survey'
+import { SurveySection, SurveyQuestion, Survey } from '@/lib/types/survey'
+import { updateSurvey } from '@/app/admin/actions'
 
-export default function CreateSurveyPage() {
+export default function EditSurveyPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
+  const params = useParams()
+  const surveyId = params.id as string
+
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [responseCount, setResponseCount] = useState<number | null>(null)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [sections, setSections] = useState<SurveySection[]>([
-    {
-      id: crypto.randomUUID(),
-      title: '섹션 1',
-      max_five_points: 3,
-      max_one_points: 3,
-      questions: [{ id: crypto.randomUUID(), text: '' }],
-    },
-  ])
+  const [sections, setSections] = useState<SurveySection[]>([])
+
+  // 설문 데이터 불러오기
+  useEffect(() => {
+    async function fetchSurvey() {
+      try {
+        const supabase = createClient()
+
+        // 설문 데이터 조회
+        const { data: surveyData, error: surveyError } = await supabase
+          .from('surveys')
+          .select('*')
+          .eq('id', surveyId)
+          .single()
+
+        if (surveyError) throw surveyError
+
+        // 응답 수 조회
+        const { count, error: countError } = await supabase
+          .from('responses')
+          .select('*', { count: 'exact', head: true })
+          .eq('survey_id', surveyId)
+
+        if (countError) throw countError
+
+        const survey = surveyData as Survey
+        setTitle(survey.title)
+        setDescription(survey.description || '')
+        setSections(survey.sections)
+        setResponseCount(count || 0)
+      } catch (err: any) {
+        setError(err.message || '설문을 불러오는데 실패했습니다.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSurvey()
+  }, [surveyId])
 
   const addSection = () => {
     setSections([
@@ -112,63 +149,135 @@ export default function CreateSurveyPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setLoading(true)
+    setSubmitting(true)
 
     // Validation
     if (!title.trim()) {
       setError('설문 제목을 입력해주세요.')
-      setLoading(false)
+      setSubmitting(false)
       return
     }
 
     for (const section of sections) {
       if (!section.title.trim()) {
         setError('모든 섹션의 제목을 입력해주세요.')
-        setLoading(false)
+        setSubmitting(false)
         return
       }
       if (section.max_five_points < 0) {
         setError('5점 선택 최대 개수는 0 이상이어야 합니다.')
-        setLoading(false)
+        setSubmitting(false)
         return
       }
       for (const question of section.questions) {
         if (!question.text.trim()) {
           setError('모든 문항을 입력해주세요.')
-          setLoading(false)
+          setSubmitting(false)
           return
         }
       }
     }
 
     try {
-      const supabase = createClient()
-      const { data, error: insertError } = await supabase
-        .from('surveys')
-        .insert({
-          title,
-          description: description.trim() || null,
-          sections,
-        })
-        .select()
-        .single()
+      const result = await updateSurvey(surveyId, {
+        title,
+        description,
+        sections,
+      })
 
-      if (insertError) throw insertError
+      if (result.error) {
+        setError(result.error)
+        setSubmitting(false)
+        return
+      }
 
       router.push('/admin')
       router.refresh()
     } catch (err: any) {
-      setError(err.message || '설문 생성에 실패했습니다.')
-      setLoading(false)
+      setError(err.message || '설문 수정에 실패했습니다.')
+      setSubmitting(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !title) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+        <Link
+          href="/admin"
+          className="mt-4 inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-500"
+        >
+          <ArrowLeft size={16} />
+          목록으로 돌아가기
+        </Link>
+      </div>
+    )
+  }
+
+  // 응답이 있으면 수정 불가
+  if (responseCount !== null && responseCount > 0) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="bg-white shadow rounded-lg p-8 text-center">
+          <div className="mb-4">
+            <svg
+              className="mx-auto h-12 w-12 text-yellow-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">
+            수정할 수 없는 설문
+          </h2>
+          <p className="text-gray-600 mb-1">
+            이 설문은 이미 <span className="font-bold text-indigo-600">{responseCount}개</span>의 응답이 제출되어
+          </p>
+          <p className="text-gray-600 mb-6">수정할 수 없습니다.</p>
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            <ArrowLeft size={16} />
+            목록으로 돌아가기
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">새 설문 만들기</h1>
+        <Link
+          href="/admin"
+          className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800 mb-4"
+        >
+          <ArrowLeft size={16} />
+          목록으로 돌아가기
+        </Link>
+        <h1 className="text-2xl font-bold text-gray-900">설문 수정</h1>
         <p className="mt-1 text-sm text-gray-600">
-          설문의 제목, 섹션, 문항을 설정하세요.
+          설문의 제목, 섹션, 문항을 수정하세요.
         </p>
       </div>
 
@@ -373,10 +482,10 @@ export default function CreateSurveyPage() {
           </button>
           <button
             type="submit"
-            disabled={loading}
+            disabled={submitting}
             className="flex-1 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? '생성 중...' : '설문 생성'}
+            {submitting ? '수정 중...' : '설문 수정'}
           </button>
         </div>
       </form>

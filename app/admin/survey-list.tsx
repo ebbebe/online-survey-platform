@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Survey } from '@/lib/types/survey'
+import { SurveyWithResponseCount } from '@/lib/types/survey'
 import { Trash2, Edit, Eye, Plus } from 'lucide-react'
 import { deleteSurvey } from './actions'
 import { useRouter } from 'next/navigation'
 
-export function SurveyList({ surveys }: { surveys: Survey[] }) {
+export function SurveyList({ surveys }: { surveys: SurveyWithResponseCount[] }) {
   const router = useRouter()
   const [deleting, setDeleting] = useState<string | null>(null)
 
@@ -63,6 +63,10 @@ export function SurveyList({ surveys }: { surveys: Survey[] }) {
                     </span>
                     <span className="mx-2">•</span>
                     <span>섹션 {survey.sections.length}개</span>
+                    <span className="mx-2">•</span>
+                    <span className={survey.responseCount > 0 ? 'text-indigo-600 font-medium' : ''}>
+                      응답 {survey.responseCount}개
+                    </span>
                   </div>
                 </div>
                 <div className="ml-4 flex items-center gap-2">
@@ -74,6 +78,23 @@ export function SurveyList({ surveys }: { surveys: Survey[] }) {
                   >
                     <Eye size={16} />
                     보기
+                  </Link>
+                  <Link
+                    href={`/admin/surveys/${survey.id}/edit`}
+                    className={`inline-flex items-center gap-1 px-3 py-2 border text-sm font-medium rounded-md ${
+                      survey.responseCount > 0
+                        ? 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
+                        : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                    }`}
+                    title={survey.responseCount > 0 ? '응답이 있어 수정 불가' : '설문 수정'}
+                    onClick={(e) => {
+                      if (survey.responseCount > 0) {
+                        e.preventDefault()
+                      }
+                    }}
+                  >
+                    <Edit size={16} />
+                    수정
                   </Link>
                   <Link
                     href={`/admin/surveys/${survey.id}/results`}

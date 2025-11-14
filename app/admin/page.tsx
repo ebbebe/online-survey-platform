@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { Survey } from '@/lib/types/survey'
+import { Survey, SurveyWithResponseCount } from '@/lib/types/survey'
 import { Plus } from 'lucide-react'
 import { SurveyList } from './survey-list'
 
 export const dynamic = 'force-dynamic'
 
-async function getSurveys(): Promise<Survey[]> {
+async function getSurveysWithResponseCount(): Promise<SurveyWithResponseCount[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('surveys')
@@ -18,11 +18,28 @@ async function getSurveys(): Promise<Survey[]> {
     return []
   }
 
-  return data as Survey[]
+  const surveys = data as Survey[]
+
+  // 각 설문의 응답 수 조회
+  const surveysWithCount = await Promise.all(
+    surveys.map(async (survey) => {
+      const { count } = await supabase
+        .from('responses')
+        .select('*', { count: 'exact', head: true })
+        .eq('survey_id', survey.id)
+
+      return {
+        ...survey,
+        responseCount: count || 0,
+      }
+    })
+  )
+
+  return surveysWithCount
 }
 
 export default async function AdminDashboard() {
-  const surveys = await getSurveys()
+  const surveys = await getSurveysWithResponseCount()
 
   return (
     <div className="px-4 sm:px-0">

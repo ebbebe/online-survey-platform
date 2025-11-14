@@ -100,14 +100,26 @@ export default function SurveyResponsePage() {
     const currentAnswers = sectionAnswers[sectionId] || {}
     const oldValue = currentAnswers[questionId] || 0
 
-    // 5점을 선택한 문항 수 계산
-    const fivePointCount = Object.values(currentAnswers).filter((v) => v === 5).length
-
-    // 5점으로 변경하려고 할 때
-    if (value === 5 && oldValue !== 5) {
-      if (fivePointCount >= section.max_five_points) {
+    // 1점 제약 체크
+    const onePointCount = Object.values(currentAnswers).filter((v) => v === 1).length
+    if (value === 1 && oldValue !== 1) {
+      const maxOnePoints = section.max_one_points ?? 3 // fallback for existing surveys
+      if (maxOnePoints > 0 && onePointCount >= maxOnePoints) {
         setError(
-          `이 섹션에서는 최대 ${section.max_five_points}개의 문항에만 5점을 선택할 수 있습니다.`
+          `이 섹션에서는 최대 ${maxOnePoints}개의 문항에만 1점을 선택할 수 있습니다.`
+        )
+        setTimeout(() => setError(''), 3000)
+        return
+      }
+    }
+
+    // 5점 제약 체크
+    const fivePointCount = Object.values(currentAnswers).filter((v) => v === 5).length
+    if (value === 5 && oldValue !== 5) {
+      const maxFivePoints = section.max_five_points ?? 3 // fallback for existing surveys
+      if (maxFivePoints > 0 && fivePointCount >= maxFivePoints) {
+        setError(
+          `이 섹션에서는 최대 ${maxFivePoints}개의 문항에만 5점을 선택할 수 있습니다.`
         )
         setTimeout(() => setError(''), 3000)
         return
@@ -310,23 +322,38 @@ export default function SurveyResponsePage() {
 
           {/* 척도 문항 섹션 */}
           {survey.sections.map((section, sectionIndex) => {
+            const onePointCount = Object.values(sectionAnswers[section.id] || {}).filter(
+              (v) => v === 1
+            ).length
             const fivePointCount = Object.values(sectionAnswers[section.id] || {}).filter(
               (v) => v === 5
             ).length
+
+            const maxOnePoints = section.max_one_points ?? 3
+            const maxFivePoints = section.max_five_points ?? 3
 
             return (
               <div key={section.id} className="bg-white shadow rounded-lg p-6">
                 <div className="mb-4">
                   <h2 className="text-lg font-bold text-gray-900">{section.title}</h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    이 섹션에서는 최대 {section.max_five_points}개의 문항에만 5점을 선택할
-                    수 있습니다.
-                    {section.max_five_points > 0 && (
-                      <span className="ml-2 text-indigo-600 font-medium">
-                        (현재 {fivePointCount}/{section.max_five_points})
-                      </span>
+                  <div className="text-sm text-gray-600 mt-1 space-y-1">
+                    {maxOnePoints > 0 && (
+                      <p>
+                        1점: 최대 {maxOnePoints}개 선택 가능
+                        <span className="ml-2 text-indigo-600 font-medium">
+                          (현재 {onePointCount}/{maxOnePoints})
+                        </span>
+                      </p>
                     )}
-                  </p>
+                    {maxFivePoints > 0 && (
+                      <p>
+                        5점: 최대 {maxFivePoints}개 선택 가능
+                        <span className="ml-2 text-indigo-600 font-medium">
+                          (현재 {fivePointCount}/{maxFivePoints})
+                        </span>
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-6">

@@ -9,6 +9,7 @@ export interface SurveySection {
   id: string
   title: string
   max_five_points: number // 5점을 선택할 수 있는 최대 개수
+  max_one_points: number // 1점을 선택할 수 있는 최대 개수
   questions: SurveyQuestion[]
 }
 
@@ -40,6 +41,11 @@ export interface Response {
   basic_info: BasicInfoAnswer
   section_answers: SectionAnswers
   created_at: string
+}
+
+// Survey with response count (for admin list)
+export interface SurveyWithResponseCount extends Survey {
+  responseCount: number
 }
 
 // Create Survey Form Types
