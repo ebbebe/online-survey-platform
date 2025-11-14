@@ -271,12 +271,34 @@ export default function SurveyResultsPage() {
               <div className="space-y-8">
                 {section.questions.map((question) => {
                   const stats = calculateStatistics(section.id, question.id)
+                  const totalResponses = stats.count
+
                   const chartData = [
-                    { score: '1점', count: stats.distribution[0] },
-                    { score: '2점', count: stats.distribution[1] },
-                    { score: '3점', count: stats.distribution[2] },
-                    { score: '4점', count: stats.distribution[3] },
-                    { score: '5점', count: stats.distribution[4] },
+                    {
+                      score: '1점',
+                      count: stats.distribution[0],
+                      percent: totalResponses > 0 ? ((stats.distribution[0] / totalResponses) * 100).toFixed(1) : '0.0'
+                    },
+                    {
+                      score: '2점',
+                      count: stats.distribution[1],
+                      percent: totalResponses > 0 ? ((stats.distribution[1] / totalResponses) * 100).toFixed(1) : '0.0'
+                    },
+                    {
+                      score: '3점',
+                      count: stats.distribution[2],
+                      percent: totalResponses > 0 ? ((stats.distribution[2] / totalResponses) * 100).toFixed(1) : '0.0'
+                    },
+                    {
+                      score: '4점',
+                      count: stats.distribution[3],
+                      percent: totalResponses > 0 ? ((stats.distribution[3] / totalResponses) * 100).toFixed(1) : '0.0'
+                    },
+                    {
+                      score: '5점',
+                      count: stats.distribution[4],
+                      percent: totalResponses > 0 ? ((stats.distribution[4] / totalResponses) * 100).toFixed(1) : '0.0'
+                    },
                   ]
 
                   return (
@@ -298,7 +320,31 @@ export default function SurveyResultsPage() {
                           <YAxis />
                           <Tooltip />
                           <Legend />
-                          <Bar dataKey="count" fill="#4F46E5" name="응답 수" />
+                          <Bar
+                            dataKey="count"
+                            fill="#4F46E5"
+                            name="응답 수"
+                            label={{
+                              position: 'center',
+                              content: (props: any) => {
+                                const { x, y, width, height, index } = props
+                                const percent = chartData[index]?.percent
+                                return (
+                                  <text
+                                    x={x + width / 2}
+                                    y={y + height / 2}
+                                    fill="white"
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    fontSize={12}
+                                    fontWeight="500"
+                                  >
+                                    {percent}%
+                                  </text>
+                                )
+                              }
+                            }}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
 

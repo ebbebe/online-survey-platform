@@ -345,11 +345,11 @@ export default function SurveyResponsePage() {
                         </p>
                         <div className="space-y-2">
                           {[
-                            { score: 1, label: '전혀 그렇지 않다' },
-                            { score: 2, label: '드물다' },
-                            { score: 3, label: '가끔 그렇다' },
+                            { score: 5, label: '항상 그렇다' },
                             { score: 4, label: '그런 편이다' },
-                            { score: 5, label: '항상 그렇다' }
+                            { score: 3, label: '가끔 그렇다' },
+                            { score: 2, label: '드물다' },
+                            { score: 1, label: '전혀 그렇지 않다' }
                           ].map(({ score, label }) => (
                             <button
                               key={score}
