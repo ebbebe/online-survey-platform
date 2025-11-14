@@ -260,7 +260,7 @@ export default function SurveyResponsePage() {
             <div className="space-y-4">
               {survey.basic_info_questions?.map((question, index) => (
                 <div key={question.id}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-base font-semibold text-gray-700 mb-2">
                     {index + 1}. {question.label} *
                   </label>
                   {question.type === 'text' ? (
@@ -276,19 +276,20 @@ export default function SurveyResponsePage() {
                   ) : (
                     <div className="space-y-2">
                       {question.options?.map((option, optionIndex) => (
-                        <label key={optionIndex} className="flex items-center">
-                          <input
-                            type="radio"
-                            name={question.id}
-                            value={option}
-                            checked={basicInfo[question.id] === option}
-                            onChange={(e) =>
-                              setBasicInfo({ ...basicInfo, [question.id]: e.target.value })
-                            }
-                            className="mr-2"
-                          />
-                          <span className="text-sm text-gray-700">{option}</span>
-                        </label>
+                        <button
+                          key={optionIndex}
+                          type="button"
+                          onClick={() =>
+                            setBasicInfo({ ...basicInfo, [question.id]: option })
+                          }
+                          className={`w-full p-3 rounded-lg border-2 text-left transition-all text-sm ${
+                            basicInfo[question.id] === option
+                              ? 'bg-indigo-100 border-indigo-500 text-indigo-900'
+                              : 'bg-white border-gray-300 text-gray-700 hover:border-indigo-400'
+                          }`}
+                        >
+                          {option}
+                        </button>
                       ))}
                     </div>
                   )}
@@ -339,32 +340,31 @@ export default function SurveyResponsePage() {
 
                     return (
                       <div key={question.id} className="pb-4 border-b border-gray-200 last:border-b-0">
-                        <p className="text-sm font-medium text-gray-900 mb-3">
+                        <p className="text-base font-semibold text-gray-900 mb-4">
                           {questionIndex + 1}. {question.text} *
                         </p>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-gray-500 w-16 text-center">
-                            매우<br/>그렇지 않다
-                          </span>
-                          <div className="flex gap-2 flex-1 justify-center">
-                            {[1, 2, 3, 4, 5].map((score) => (
-                              <button
-                                key={score}
-                                type="button"
-                                onClick={() => updateAnswer(section.id, question.id, score)}
-                                className={`w-12 h-12 rounded-full border-2 transition-all ${
-                                  value === score
-                                    ? 'bg-indigo-600 border-indigo-600 text-white scale-110'
-                                    : 'bg-white border-gray-300 text-gray-700 hover:border-indigo-400'
-                                }`}
-                              >
-                                {score}
-                              </button>
-                            ))}
-                          </div>
-                          <span className="text-xs text-gray-500 w-16 text-center">
-                            매우<br/>그렇다
-                          </span>
+                        <div className="space-y-2">
+                          {[
+                            { score: 5, label: '항상 그렇다' },
+                            { score: 4, label: '그런 편이다' },
+                            { score: 3, label: '가끔 그렇다' },
+                            { score: 2, label: '드물다' },
+                            { score: 1, label: '전혀 그렇지 않다' }
+                          ].map(({ score, label }) => (
+                            <button
+                              key={score}
+                              type="button"
+                              onClick={() => updateAnswer(section.id, question.id, score)}
+                              className={`w-full p-3 rounded-lg border-2 transition-all flex items-center justify-between ${
+                                value === score
+                                  ? 'bg-indigo-100 border-indigo-500 text-indigo-900'
+                                  : 'bg-white border-gray-300 text-gray-700 hover:border-indigo-400'
+                              }`}
+                            >
+                              <span className="text-sm">{label}</span>
+                              <span className="text-xl font-bold">{score}</span>
+                            </button>
+                          ))}
                         </div>
                       </div>
                     )
