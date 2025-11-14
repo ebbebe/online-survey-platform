@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { Plus, Trash2, X, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { SurveySection, SurveyQuestion, Survey } from '@/lib/types/survey'
+import { SurveySection, SurveyQuestion, Survey, BasicInfoQuestion } from '@/lib/types/survey'
 import { updateSurvey } from '@/app/admin/actions'
 
 export default function EditSurveyPage() {
@@ -20,6 +20,7 @@ export default function EditSurveyPage() {
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [basicInfoQuestions, setBasicInfoQuestions] = useState<BasicInfoQuestion[]>([])
   const [sections, setSections] = useState<SurveySection[]>([])
 
   // 설문 데이터 불러오기
@@ -48,6 +49,7 @@ export default function EditSurveyPage() {
         const survey = surveyData as Survey
         setTitle(survey.title)
         setDescription(survey.description || '')
+        setBasicInfoQuestions(survey.basic_info_questions || [])
         setSections(survey.sections)
         setResponseCount(count || 0)
       } catch (err: any) {
@@ -59,6 +61,85 @@ export default function EditSurveyPage() {
 
     fetchSurvey()
   }, [surveyId])
+
+  // 기본정보 관리 함수들
+  const addBasicInfoQuestion = () => {
+    setBasicInfoQuestions([
+      ...basicInfoQuestions,
+      {
+        id: crypto.randomUUID(),
+        label: '',
+        type: 'text',
+      },
+    ])
+  }
+
+  const removeBasicInfoQuestion = (questionId: string) => {
+    if (basicInfoQuestions.length === 1) {
+      setError('최소 1개의 기본정보 문항이 필요합니다.')
+      return
+    }
+    setBasicInfoQuestions(basicInfoQuestions.filter((q) => q.id !== questionId))
+  }
+
+  const updateQuestionLabel = (questionId: string, label: string) => {
+    setBasicInfoQuestions(
+      basicInfoQuestions.map((q) =>
+        q.id === questionId ? { ...q, label } : q
+      )
+    )
+  }
+
+  const updateQuestionType = (questionId: string, type: 'text' | 'select') => {
+    setBasicInfoQuestions(
+      basicInfoQuestions.map((q) =>
+        q.id === questionId
+          ? { ...q, type, options: type === 'select' ? [''] : undefined }
+          : q
+      )
+    )
+  }
+
+  const addOption = (questionId: string) => {
+    setBasicInfoQuestions(
+      basicInfoQuestions.map((q) =>
+        q.id === questionId
+          ? { ...q, options: [...(q.options || []), ''] }
+          : q
+      )
+    )
+  }
+
+  const removeOption = (questionId: string, optionIndex: number) => {
+    setBasicInfoQuestions(
+      basicInfoQuestions.map((q) => {
+        if (q.id === questionId && q.options) {
+          if (q.options.length === 1) {
+            setError('객관식 문항은 최소 1개의 선택지가 필요합니다.')
+            return q
+          }
+          return {
+            ...q,
+            options: q.options.filter((_, i) => i !== optionIndex),
+          }
+        }
+        return q
+      })
+    )
+  }
+
+  const updateOption = (questionId: string, optionIndex: number, value: string) => {
+    setBasicInfoQuestions(
+      basicInfoQuestions.map((q) =>
+        q.id === questionId && q.options
+          ? {
+              ...q,
+              options: q.options.map((opt, i) => (i === optionIndex ? value : opt)),
+            }
+          : q
+      )
+    )
+  }
 
   const addSection = () => {
     setSections([
@@ -158,6 +239,29 @@ export default function EditSurveyPage() {
       return
     }
 
+    // 기본정보 검증
+    for (const question of basicInfoQuestions) {
+      if (!question.label.trim()) {
+        setError('모든 기본정보 문항의 질문을 입력해주세요.')
+        setSubmitting(false)
+        return
+      }
+      if (question.type === 'select') {
+        if (!question.options || question.options.length === 0) {
+          setError('객관식 문항은 최소 1개의 선택지가 필요합니다.')
+          setSubmitting(false)
+          return
+        }
+        for (const option of question.options) {
+          if (!option.trim()) {
+            setError('모든 선택지를 입력해주세요.')
+            setSubmitting(false)
+            return
+          }
+        }
+      }
+    }
+
     for (const section of sections) {
       if (!section.title.trim()) {
         setError('모든 섹션의 제목을 입력해주세요.')
@@ -182,6 +286,7 @@ export default function EditSurveyPage() {
       const result = await updateSurvey(surveyId, {
         title,
         description,
+        basic_info_questions: basicInfoQuestions,
         sections,
       })
 
@@ -331,6 +436,132 @@ export default function EditSurveyPage() {
                 placeholder="설문에 대한 간단한 설명을 입력하세요."
               />
             </div>
+          </div>
+        </div>
+
+        {/* 기본정보 문항 */}
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">기본정보 문항</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            응답자에게 수집할 기본 정보를 설정하세요. (이름, 부서, 연령 등)
+          </p>
+
+          <div className="space-y-4">
+            {basicInfoQuestions.map((question, index) => (
+              <div key={question.id} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-gray-900">
+                    문항 {index + 1}
+                  </h3>
+                  {basicInfoQuestions.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeBasicInfoQuestion(question.id)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      질문 *
+                    </label>
+                    <input
+                      type="text"
+                      value={question.label}
+                      onChange={(e) => updateQuestionLabel(question.id, e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                      placeholder="예: 귀하의 이름은?"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      응답 형식 *
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name={`type-${question.id}`}
+                          value="text"
+                          checked={question.type === 'text'}
+                          onChange={() => updateQuestionType(question.id, 'text')}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">주관식 (텍스트 입력)</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name={`type-${question.id}`}
+                          value="select"
+                          checked={question.type === 'select'}
+                          onChange={() => updateQuestionType(question.id, 'select')}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">객관식 (선택지)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {question.type === 'select' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        선택지 *
+                      </label>
+                      <div className="space-y-2">
+                        {question.options?.map((option, optionIndex) => (
+                          <div key={optionIndex} className="flex gap-2">
+                            <div className="flex-shrink-0 w-6 pt-2 text-sm text-gray-500">
+                              {optionIndex + 1}.
+                            </div>
+                            <input
+                              type="text"
+                              value={option}
+                              onChange={(e) =>
+                                updateOption(question.id, optionIndex, e.target.value)
+                              }
+                              className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                              placeholder="선택지를 입력하세요"
+                            />
+                            {question.options && question.options.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeOption(question.id, optionIndex)}
+                                className="flex-shrink-0 text-red-600 hover:text-red-800"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => addOption(question.id)}
+                          className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800"
+                        >
+                          <Plus size={16} />
+                          선택지 추가
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={addBasicInfoQuestion}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:border-gray-400 hover:text-gray-900"
+            >
+              <Plus size={20} />
+              기본정보 문항 추가
+            </button>
           </div>
         </div>
 

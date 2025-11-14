@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { SurveySection } from '@/lib/types/survey'
+import { SurveySection, BasicInfoQuestion } from '@/lib/types/survey'
 
 export async function deleteSurvey(surveyId: string) {
   try {
@@ -34,6 +34,7 @@ export async function updateSurvey(
   data: {
     title: string
     description: string
+    basic_info_questions: BasicInfoQuestion[]
     sections: SurveySection[]
   }
 ) {
@@ -65,6 +66,7 @@ export async function updateSurvey(
       .update({
         title: data.title,
         description: data.description.trim() || null,
+        basic_info_questions: data.basic_info_questions,
         sections: data.sections,
         updated_at: new Date().toISOString(),
       })

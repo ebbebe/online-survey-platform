@@ -97,11 +97,12 @@ export default function SurveyResultsPage() {
       const row: any = {
         '번호': index + 1,
         '제출일시': new Date(response.created_at).toLocaleString('ko-KR'),
-        '이름': response.basic_info.name,
-        '부서': response.basic_info.department,
-        '연령': response.basic_info.age,
-        '경력': response.basic_info.career,
       }
+
+      // 동적 기본정보 추가
+      survey.basic_info_questions?.forEach((question) => {
+        row[question.label] = response.basic_info[question.id] || ''
+      })
 
       survey.sections.forEach((section) => {
         section.questions.forEach((question) => {
@@ -129,11 +130,12 @@ export default function SurveyResultsPage() {
       const row: any = {
         '번호': index + 1,
         '제출일시': new Date(response.created_at).toLocaleString('ko-KR'),
-        '이름': response.basic_info.name,
-        '부서': response.basic_info.department,
-        '연령': response.basic_info.age,
-        '경력': response.basic_info.career,
       }
+
+      // 동적 기본정보 추가
+      survey.basic_info_questions?.forEach((question) => {
+        row[question.label] = response.basic_info[question.id] || ''
+      })
 
       survey.sections.forEach((section) => {
         section.questions.forEach((question) => {
@@ -223,7 +225,7 @@ export default function SurveyResultsPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* 기본 정보 응답 */}
+          {/* 기본 정보 응답 (동적) */}
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">기본 정보 응답</h2>
             <div className="overflow-x-auto">
@@ -233,18 +235,11 @@ export default function SurveyResultsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       번호
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      이름
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      부서
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      연령
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      경력
-                    </th>
+                    {survey.basic_info_questions?.map((question) => (
+                      <th key={question.id} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        {question.label}
+                      </th>
+                    ))}
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       제출일시
                     </th>
@@ -254,18 +249,11 @@ export default function SurveyResultsPage() {
                   {responses.map((response, index) => (
                     <tr key={response.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {response.basic_info.name}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {response.basic_info.department}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {response.basic_info.age}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {response.basic_info.career}
-                      </td>
+                      {survey.basic_info_questions?.map((question) => (
+                        <td key={question.id} className="px-4 py-3 text-sm text-gray-900">
+                          {response.basic_info[question.id] || '-'}
+                        </td>
+                      ))}
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {new Date(response.created_at).toLocaleString('ko-KR')}
                       </td>

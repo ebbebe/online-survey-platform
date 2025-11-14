@@ -17,13 +17,8 @@ export default function SurveyResponsePage() {
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  // 기본 정보 답변
-  const [basicInfo, setBasicInfo] = useState<BasicInfoAnswer>({
-    name: '',
-    department: '',
-    age: '',
-    career: '',
-  })
+  // 기본 정보 답변 (동적)
+  const [basicInfo, setBasicInfo] = useState<BasicInfoAnswer>({})
 
   // 섹션별 답변
   const [sectionAnswers, setSectionAnswers] = useState<SectionAnswers>({})
@@ -44,6 +39,15 @@ export default function SurveyResponsePage() {
         if (fetchError) throw fetchError
 
         setSurvey(data as Survey)
+
+        // 기본정보 답변 초기화
+        const initialBasicInfo: BasicInfoAnswer = {}
+        if (data.basic_info_questions) {
+          data.basic_info_questions.forEach((question: any) => {
+            initialBasicInfo[question.id] = ''
+          })
+        }
+        setBasicInfo(initialBasicInfo)
 
         // 섹션별 답변 초기화
         const initialAnswers: SectionAnswers = {}
@@ -68,18 +72,22 @@ export default function SurveyResponsePage() {
   useEffect(() => {
     if (!survey) return
 
-    const totalFields = 4 + survey.sections.reduce(
+    const basicInfoCount = survey.basic_info_questions?.length || 0
+    const totalFields = basicInfoCount + survey.sections.reduce(
       (acc, section) => acc + section.questions.length,
       0
     )
 
     let filledFields = 0
 
-    // 기본 정보
-    if (basicInfo.name) filledFields++
-    if (basicInfo.department) filledFields++
-    if (basicInfo.age) filledFields++
-    if (basicInfo.career) filledFields++
+    // 기본 정보 (동적)
+    if (survey.basic_info_questions) {
+      survey.basic_info_questions.forEach((question) => {
+        if (basicInfo[question.id]?.trim()) {
+          filledFields++
+        }
+      })
+    }
 
     // 섹션 답변
     survey.sections.forEach((section) => {
@@ -139,22 +147,14 @@ export default function SurveyResponsePage() {
     e.preventDefault()
     setError('')
 
-    // 유효성 검사
-    if (!basicInfo.name.trim()) {
-      setError('이름을 입력해주세요.')
-      return
-    }
-    if (!basicInfo.department.trim()) {
-      setError('부서를 입력해주세요.')
-      return
-    }
-    if (!basicInfo.age.trim()) {
-      setError('연령을 입력해주세요.')
-      return
-    }
-    if (!basicInfo.career.trim()) {
-      setError('경력을 입력해주세요.')
-      return
+    // 기본정보 유효성 검사 (동적)
+    if (survey?.basic_info_questions) {
+      for (const question of survey.basic_info_questions) {
+        if (!basicInfo[question.id]?.trim()) {
+          setError(`"${question.label}" 항목을 입력해주세요.`)
+          return
+        }
+      }
     }
 
     // 모든 문항 응답 확인
@@ -242,7 +242,7 @@ export default function SurveyResponsePage() {
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">{survey.title}</h1>
           {survey.description && (
-            <p className="text-gray-600">{survey.description}</p>
+            <p className="text-gray-600 whitespace-pre-line">{survey.description}</p>
           )}
           <p className="mt-4 text-sm text-red-600">* 모든 항목은 필수 응답입니다.</p>
         </div>
@@ -254,69 +254,46 @@ export default function SurveyResponsePage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 기본 정보 */}
+          {/* 기본 정보 (동적) */}
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">기본 정보</h2>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  1. 귀하의 이름은? *
-                </label>
-                <input
-                  type="text"
-                  value={basicInfo.name}
-                  onChange={(e) =>
-                    setBasicInfo({ ...basicInfo, name: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="이름을 입력하세요"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  2. 귀하의 부서는? *
-                </label>
-                <input
-                  type="text"
-                  value={basicInfo.department}
-                  onChange={(e) =>
-                    setBasicInfo({ ...basicInfo, department: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="부서를 입력하세요"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  3. 귀하의 연령은? *
-                </label>
-                <input
-                  type="text"
-                  value={basicInfo.age}
-                  onChange={(e) =>
-                    setBasicInfo({ ...basicInfo, age: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="예: 30대"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  4. 귀하의 총 직장 경력기간은? *
-                </label>
-                <input
-                  type="text"
-                  value={basicInfo.career}
-                  onChange={(e) =>
-                    setBasicInfo({ ...basicInfo, career: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="예: 5년 이하"
-                />
-              </div>
+              {survey.basic_info_questions?.map((question, index) => (
+                <div key={question.id}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {index + 1}. {question.label} *
+                  </label>
+                  {question.type === 'text' ? (
+                    <input
+                      type="text"
+                      value={basicInfo[question.id] || ''}
+                      onChange={(e) =>
+                        setBasicInfo({ ...basicInfo, [question.id]: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="답변을 입력하세요"
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      {question.options?.map((option, optionIndex) => (
+                        <label key={optionIndex} className="flex items-center">
+                          <input
+                            type="radio"
+                            name={question.id}
+                            value={option}
+                            checked={basicInfo[question.id] === option}
+                            onChange={(e) =>
+                              setBasicInfo({ ...basicInfo, [question.id]: e.target.value })
+                            }
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-700">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 

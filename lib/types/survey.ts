@@ -13,11 +13,17 @@ export interface SurveySection {
   questions: SurveyQuestion[]
 }
 
+// 기본정보 문항 타입
+export interface BasicInfoQuestion {
+  id: string
+  label: string // "귀하의 이름은?"
+  type: 'text' | 'select'
+  options?: string[] // type이 'select'일 때만 사용
+}
+
+// 기본정보 응답 (동적)
 export interface BasicInfoAnswer {
-  name: string // 이름
-  department: string // 부서
-  age: string // 연령
-  career: string // 총 직장 경력기간
+  [questionId: string]: string // { "q1": "홍길동", "q2": "남성" }
 }
 
 export interface SectionAnswers {
@@ -30,6 +36,7 @@ export interface Survey {
   id: string
   title: string
   description: string | null
+  basic_info_questions: BasicInfoQuestion[] // 기본정보 문항
   sections: SurveySection[]
   created_at: string
   updated_at: string

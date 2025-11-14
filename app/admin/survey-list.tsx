@@ -55,7 +55,7 @@ export function SurveyList({ surveys }: { surveys: SurveyWithResponseCount[] }) 
                     {survey.title}
                   </h3>
                   {survey.description && (
-                    <p className="mt-1 text-sm text-gray-500">{survey.description}</p>
+                    <p className="mt-1 text-sm text-gray-500 whitespace-pre-line line-clamp-2">{survey.description}</p>
                   )}
                   <div className="mt-2 flex items-center text-sm text-gray-500">
                     <span>
