@@ -324,6 +324,7 @@ export default function SurveyResultsPage() {
                             dataKey="count"
                             fill="#4F46E5"
                             name="응답 수"
+                            isAnimationActive={false}
                             label={{
                               position: 'center',
                               content: (props: any) => {
