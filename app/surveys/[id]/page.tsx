@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Survey, BasicInfoAnswer, SectionAnswers } from '@/lib/types/survey'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, X } from 'lucide-react'
 
 export default function SurveyResponsePage() {
   const params = useParams()
@@ -16,6 +16,9 @@ export default function SurveyResponsePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [showLimitModal, setShowLimitModal] = useState(false)
+  const [limitModalMessage, setLimitModalMessage] = useState('')
+  const [isClosing, setIsClosing] = useState(false)
 
   // 기본 정보 답변 (동적)
   const [basicInfo, setBasicInfo] = useState<BasicInfoAnswer>({})
@@ -101,6 +104,38 @@ export default function SurveyResponsePage() {
     setProgress(Math.round((filledFields / totalFields) * 100))
   }, [basicInfo, sectionAnswers, survey])
 
+  // 토스트 닫기 함수 (페이드아웃 애니메이션 후 닫기)
+  const closeToast = () => {
+    setIsClosing(true)
+    setTimeout(() => {
+      setShowLimitModal(false)
+      setIsClosing(false)
+    }, 200) // fadeOut 애니메이션 시간
+  }
+
+  // 3초 후 자동으로 사라지기
+  useEffect(() => {
+    if (showLimitModal && !isClosing) {
+      const timer = setTimeout(() => {
+        closeToast()
+      }, 3000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [showLimitModal, isClosing])
+
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showLimitModal && !isClosing) {
+        closeToast()
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [showLimitModal, isClosing])
+
   const updateAnswer = (sectionId: string, questionId: string, value: number) => {
     const section = survey?.sections.find((s) => s.id === sectionId)
     if (!section) return
@@ -113,10 +148,8 @@ export default function SurveyResponsePage() {
     if (value === 1 && oldValue !== 1) {
       const maxOnePoints = section.max_one_points ?? 3 // fallback for existing surveys
       if (maxOnePoints > 0 && onePointCount >= maxOnePoints) {
-        setError(
-          `이 섹션에서는 최대 ${maxOnePoints}개의 문항에만 1점을 선택할 수 있습니다.`
-        )
-        setTimeout(() => setError(''), 3000)
+        setLimitModalMessage(`1점은 최대 ${maxOnePoints}개까지만 선택 가능합니다`)
+        setShowLimitModal(true)
         return
       }
     }
@@ -126,10 +159,8 @@ export default function SurveyResponsePage() {
     if (value === 5 && oldValue !== 5) {
       const maxFivePoints = section.max_five_points ?? 3 // fallback for existing surveys
       if (maxFivePoints > 0 && fivePointCount >= maxFivePoints) {
-        setError(
-          `이 섹션에서는 최대 ${maxFivePoints}개의 문항에만 5점을 선택할 수 있습니다.`
-        )
-        setTimeout(() => setError(''), 3000)
+        setLimitModalMessage(`5점은 최대 ${maxFivePoints}개까지만 선택 가능합니다`)
+        setShowLimitModal(true)
         return
       }
     }
@@ -385,6 +416,46 @@ export default function SurveyResponsePage() {
             </button>
           </div>
         </form>
+
+        {/* 상단 토스트 알림 */}
+        {showLimitModal && (
+          <div
+            className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4 px-4 pointer-events-none"
+            style={{
+              animation: isClosing ? 'fadeOut 0.2s ease-out forwards' : 'pulseIn 0.3s ease-out'
+            }}
+          >
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-4 pointer-events-auto border-l-4 border-red-500">
+              <div className="flex items-start gap-3">
+                {/* 경고 아이콘 */}
+                <div className="flex-shrink-0 w-6 h-6 mt-0.5">
+                  <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+
+                {/* 메시지 */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900 mb-1">
+                    입력 최대치에 도달하였습니다
+                  </p>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    {limitModalMessage}
+                  </p>
+                </div>
+
+                {/* 닫기 버튼 */}
+                <button
+                  onClick={closeToast}
+                  className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-lg -mt-1"
+                  aria-label="닫기"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
