@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback, memo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -10,6 +10,159 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import * as XLSX from 'xlsx'
 import Papa from 'papaparse'
 import { deleteResponse, deleteMultipleResponses } from '@/app/admin/actions'
+
+// 응답 행 컴포넌트 (메모이제이션)
+const ResponseRow = memo(({
+  response,
+  index,
+  survey,
+  isSelected,
+  onSelect,
+  onDelete,
+  deleting
+}: {
+  response: Response
+  index: number
+  survey: Survey
+  isSelected: boolean
+  onSelect: (id: string) => void
+  onDelete: (id: string) => void
+  deleting: boolean
+}) => {
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-4 py-3">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onSelect(response.id)}
+          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+        />
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
+      {survey.basic_info_questions?.map((question) => (
+        <td key={question.id} className="px-4 py-3 text-sm text-gray-900">
+          {response.basic_info[question.id] || '-'}
+        </td>
+      ))}
+      <td className="px-4 py-3 text-sm text-gray-500">
+        {new Date(response.created_at).toLocaleString('ko-KR')}
+      </td>
+      <td className="px-4 py-3">
+        <button
+          onClick={() => onDelete(response.id)}
+          disabled={deleting}
+          className="text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="삭제"
+        >
+          <Trash2 size={16} />
+        </button>
+      </td>
+    </tr>
+  )
+})
+
+ResponseRow.displayName = 'ResponseRow'
+
+// 차트 컴포넌트 (메모이제이션)
+const QuestionChart = memo(({
+  stats,
+  questionText
+}: {
+  stats: { average: number; distribution: number[]; count: number }
+  questionText: string
+}) => {
+  const totalResponses = stats.count
+
+  const chartData = useMemo(() => [
+    {
+      score: '1점',
+      count: stats.distribution[0],
+      percent: totalResponses > 0 ? ((stats.distribution[0] / totalResponses) * 100).toFixed(1) : '0.0'
+    },
+    {
+      score: '2점',
+      count: stats.distribution[1],
+      percent: totalResponses > 0 ? ((stats.distribution[1] / totalResponses) * 100).toFixed(1) : '0.0'
+    },
+    {
+      score: '3점',
+      count: stats.distribution[2],
+      percent: totalResponses > 0 ? ((stats.distribution[2] / totalResponses) * 100).toFixed(1) : '0.0'
+    },
+    {
+      score: '4점',
+      count: stats.distribution[3],
+      percent: totalResponses > 0 ? ((stats.distribution[3] / totalResponses) * 100).toFixed(1) : '0.0'
+    },
+    {
+      score: '5점',
+      count: stats.distribution[4],
+      percent: totalResponses > 0 ? ((stats.distribution[4] / totalResponses) * 100).toFixed(1) : '0.0'
+    },
+  ], [stats.distribution, totalResponses])
+
+  return (
+    <div className="border-b border-gray-200 pb-6 last:border-b-0">
+      <div className="mb-4">
+        <h3 className="text-sm font-medium text-gray-900 mb-2">
+          {questionText}
+        </h3>
+        <p className="text-sm text-gray-600">
+          평균: <span className="font-bold text-indigo-600">{stats.average}</span>점
+          (총 {stats.count}명 응답)
+        </p>
+      </div>
+
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="score" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+          <Bar
+            dataKey="count"
+            fill="#4F46E5"
+            name="응답 수"
+            isAnimationActive={false}
+            label={{
+              position: 'center',
+              content: (props: any) => {
+                const { x, y, width, height, index } = props
+                const percent = chartData[index]?.percent
+                return (
+                  <text
+                    x={x + width / 2}
+                    y={y + height / 2}
+                    fill="white"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize={12}
+                    fontWeight="500"
+                  >
+                    {percent}%
+                  </text>
+                )
+              }
+            }}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+
+      <div className="mt-4 grid grid-cols-5 gap-2 text-center text-sm">
+        {stats.distribution.map((count, index) => (
+          <div key={index} className="bg-gray-50 rounded p-2">
+            <p className="font-medium text-gray-900">{index + 1}점</p>
+            <p className="text-gray-600">{count}명</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+})
+
+QuestionChart.displayName = 'QuestionChart'
 
 export default function SurveyResultsPage() {
   const params = useParams()
@@ -61,25 +214,27 @@ export default function SurveyResultsPage() {
     return () => clearInterval(interval)
   }, [surveyId])
 
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     if (selectedResponses.size === responses.length) {
       setSelectedResponses(new Set())
     } else {
       setSelectedResponses(new Set(responses.map((r) => r.id)))
     }
-  }
+  }, [selectedResponses.size, responses])
 
-  const handleSelectOne = (responseId: string) => {
-    const newSelected = new Set(selectedResponses)
-    if (newSelected.has(responseId)) {
-      newSelected.delete(responseId)
-    } else {
-      newSelected.add(responseId)
-    }
-    setSelectedResponses(newSelected)
-  }
+  const handleSelectOne = useCallback((responseId: string) => {
+    setSelectedResponses((prev) => {
+      const newSelected = new Set(prev)
+      if (newSelected.has(responseId)) {
+        newSelected.delete(responseId)
+      } else {
+        newSelected.add(responseId)
+      }
+      return newSelected
+    })
+  }, [])
 
-  const handleDeleteOne = async (responseId: string) => {
+  const handleDeleteOne = useCallback(async (responseId: string) => {
     if (!confirm('이 응답을 삭제하시겠습니까?')) {
       return
     }
@@ -99,9 +254,9 @@ export default function SurveyResultsPage() {
       })
     }
     setDeleting(false)
-  }
+  }, [])
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = useCallback(async () => {
     if (selectedResponses.size === 0) {
       return
     }
@@ -121,9 +276,10 @@ export default function SurveyResultsPage() {
       setSelectedResponses(new Set())
     }
     setDeleting(false)
-  }
+  }, [selectedResponses])
 
-  const calculateStatistics = (sectionId: string, questionId: string) => {
+  // 통계 계산 캐싱
+  const calculateStatistics = useCallback((sectionId: string, questionId: string) => {
     const values = responses
       .map((r) => r.section_answers[sectionId]?.[questionId])
       .filter((v) => v !== undefined && v !== null && v > 0)
@@ -151,9 +307,9 @@ export default function SurveyResultsPage() {
       distribution,
       count: values.length,
     }
-  }
+  }, [responses])
 
-  const exportToExcel = () => {
+  const exportToExcel = useCallback(() => {
     if (!survey || responses.length === 0) return
 
     const data: any[] = []
@@ -184,9 +340,9 @@ export default function SurveyResultsPage() {
     XLSX.utils.book_append_sheet(wb, ws, '응답 결과')
 
     XLSX.writeFile(wb, `${survey.title}_결과.xlsx`)
-  }
+  }, [survey, responses])
 
-  const exportToCSV = () => {
+  const exportToCSV = useCallback(() => {
     if (!survey || responses.length === 0) return
 
     const data: any[] = []
@@ -218,7 +374,7 @@ export default function SurveyResultsPage() {
     link.href = URL.createObjectURL(blob)
     link.download = `${survey.title}_결과.csv`
     link.click()
-  }
+  }, [survey, responses])
 
   if (loading) {
     return (
@@ -333,35 +489,16 @@ export default function SurveyResultsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {responses.map((response, index) => (
-                    <tr key={response.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedResponses.has(response.id)}
-                          onChange={() => handleSelectOne(response.id)}
-                          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
-                      {survey.basic_info_questions?.map((question) => (
-                        <td key={question.id} className="px-4 py-3 text-sm text-gray-900">
-                          {response.basic_info[question.id] || '-'}
-                        </td>
-                      ))}
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {new Date(response.created_at).toLocaleString('ko-KR')}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleDeleteOne(response.id)}
-                          disabled={deleting}
-                          className="text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="삭제"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
+                    <ResponseRow
+                      key={response.id}
+                      response={response}
+                      index={index}
+                      survey={survey}
+                      isSelected={selectedResponses.has(response.id)}
+                      onSelect={handleSelectOne}
+                      onDelete={handleDeleteOne}
+                      deleting={deleting}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -375,93 +512,12 @@ export default function SurveyResultsPage() {
               <div className="space-y-8">
                 {section.questions.map((question) => {
                   const stats = calculateStatistics(section.id, question.id)
-                  const totalResponses = stats.count
-
-                  const chartData = [
-                    {
-                      score: '1점',
-                      count: stats.distribution[0],
-                      percent: totalResponses > 0 ? ((stats.distribution[0] / totalResponses) * 100).toFixed(1) : '0.0'
-                    },
-                    {
-                      score: '2점',
-                      count: stats.distribution[1],
-                      percent: totalResponses > 0 ? ((stats.distribution[1] / totalResponses) * 100).toFixed(1) : '0.0'
-                    },
-                    {
-                      score: '3점',
-                      count: stats.distribution[2],
-                      percent: totalResponses > 0 ? ((stats.distribution[2] / totalResponses) * 100).toFixed(1) : '0.0'
-                    },
-                    {
-                      score: '4점',
-                      count: stats.distribution[3],
-                      percent: totalResponses > 0 ? ((stats.distribution[3] / totalResponses) * 100).toFixed(1) : '0.0'
-                    },
-                    {
-                      score: '5점',
-                      count: stats.distribution[4],
-                      percent: totalResponses > 0 ? ((stats.distribution[4] / totalResponses) * 100).toFixed(1) : '0.0'
-                    },
-                  ]
-
                   return (
-                    <div key={question.id} className="border-b border-gray-200 pb-6 last:border-b-0">
-                      <div className="mb-4">
-                        <h3 className="text-sm font-medium text-gray-900 mb-2">
-                          {question.text}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          평균: <span className="font-bold text-indigo-600">{stats.average}</span>점
-                          (총 {stats.count}명 응답)
-                        </p>
-                      </div>
-
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="score" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Bar
-                            dataKey="count"
-                            fill="#4F46E5"
-                            name="응답 수"
-                            isAnimationActive={false}
-                            label={{
-                              position: 'center',
-                              content: (props: any) => {
-                                const { x, y, width, height, index } = props
-                                const percent = chartData[index]?.percent
-                                return (
-                                  <text
-                                    x={x + width / 2}
-                                    y={y + height / 2}
-                                    fill="white"
-                                    textAnchor="middle"
-                                    dominantBaseline="middle"
-                                    fontSize={12}
-                                    fontWeight="500"
-                                  >
-                                    {percent}%
-                                  </text>
-                                )
-                              }
-                            }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-
-                      <div className="mt-4 grid grid-cols-5 gap-2 text-center text-sm">
-                        {stats.distribution.map((count, index) => (
-                          <div key={index} className="bg-gray-50 rounded p-2">
-                            <p className="font-medium text-gray-900">{index + 1}점</p>
-                            <p className="text-gray-600">{count}명</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <QuestionChart
+                      key={question.id}
+                      stats={stats}
+                      questionText={question.text}
+                    />
                   )
                 })}
               </div>
