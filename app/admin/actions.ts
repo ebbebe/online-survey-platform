@@ -82,3 +82,108 @@ export async function updateSurvey(
     return { error: error.message || '수정에 실패했습니다.' }
   }
 }
+
+export async function copySurvey(surveyId: string, newTitle: string) {
+  try {
+    const supabase = await createClient()
+
+    // 1. 인증 확인
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // 2. 원본 설문 가져오기
+    const { data: originalSurvey, error: fetchError } = await supabase
+      .from('surveys')
+      .select('*')
+      .eq('id', surveyId)
+      .single()
+
+    if (fetchError || !originalSurvey) {
+      throw new Error('원본 설문을 찾을 수 없습니다.')
+    }
+
+    // 3. 새 설문 생성 (응답 제외, 구조만 복사)
+    const { error: insertError } = await supabase
+      .from('surveys')
+      .insert({
+        title: newTitle,
+        description: originalSurvey.description,
+        basic_info_questions: originalSurvey.basic_info_questions,
+        sections: originalSurvey.sections,
+      })
+
+    if (insertError) {
+      throw insertError
+    }
+
+    revalidatePath('/admin')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message || '복사에 실패했습니다.' }
+  }
+}
+
+export async function deleteResponse(responseId: string) {
+  try {
+    const supabase = await createClient()
+
+    // 인증 확인
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // 응답 삭제
+    const { error } = await supabase
+      .from('responses')
+      .delete()
+      .eq('id', responseId)
+
+    if (error) {
+      throw error
+    }
+
+    revalidatePath('/admin')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message || '응답 삭제에 실패했습니다.' }
+  }
+}
+
+export async function deleteMultipleResponses(responseIds: string[]) {
+  try {
+    const supabase = await createClient()
+
+    // 인증 확인
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { error: 'Unauthorized' }
+    }
+
+    // 응답 일괄 삭제
+    const { error } = await supabase
+      .from('responses')
+      .delete()
+      .in('id', responseIds)
+
+    if (error) {
+      throw error
+    }
+
+    revalidatePath('/admin')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message || '응답 삭제에 실패했습니다.' }
+  }
+}

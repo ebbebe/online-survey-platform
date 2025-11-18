@@ -9,7 +9,9 @@
       "mcp__supabase__generate_typescript_types",
       "mcp__supabase__get_project_url",
       "mcp__supabase__get_publishable_keys",
-      "mcp__supabase__execute_sql"
+      "mcp__supabase__execute_sql",
+      "WebSearch",
+      "WebFetch(domain:developers.google.com)"
     ]
   },
   "enableAllProjectMcpServers": true,

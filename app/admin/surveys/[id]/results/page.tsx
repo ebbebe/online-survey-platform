@@ -5,10 +5,11 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Survey, Response } from '@/lib/types/survey'
-import { Download, ArrowLeft, Users } from 'lucide-react'
+import { Download, ArrowLeft, Users, Trash2, X } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import * as XLSX from 'xlsx'
 import Papa from 'papaparse'
+import { deleteResponse, deleteMultipleResponses } from '@/app/admin/actions'
 
 export default function SurveyResultsPage() {
   const params = useParams()
@@ -18,6 +19,8 @@ export default function SurveyResultsPage() {
   const [responses, setResponses] = useState<Response[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedResponses, setSelectedResponses] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     async function fetchData() {
@@ -57,6 +60,68 @@ export default function SurveyResultsPage() {
     const interval = setInterval(fetchData, 5000)
     return () => clearInterval(interval)
   }, [surveyId])
+
+  const handleSelectAll = () => {
+    if (selectedResponses.size === responses.length) {
+      setSelectedResponses(new Set())
+    } else {
+      setSelectedResponses(new Set(responses.map((r) => r.id)))
+    }
+  }
+
+  const handleSelectOne = (responseId: string) => {
+    const newSelected = new Set(selectedResponses)
+    if (newSelected.has(responseId)) {
+      newSelected.delete(responseId)
+    } else {
+      newSelected.add(responseId)
+    }
+    setSelectedResponses(newSelected)
+  }
+
+  const handleDeleteOne = async (responseId: string) => {
+    if (!confirm('이 응답을 삭제하시겠습니까?')) {
+      return
+    }
+
+    setDeleting(true)
+    const result = await deleteResponse(responseId)
+
+    if (result.error) {
+      alert(`삭제 실패: ${result.error}`)
+    } else {
+      // 낙관적 UI 업데이트
+      setResponses((prev) => prev.filter((r) => r.id !== responseId))
+      setSelectedResponses((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(responseId)
+        return newSet
+      })
+    }
+    setDeleting(false)
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedResponses.size === 0) {
+      return
+    }
+
+    if (!confirm(`선택한 ${selectedResponses.size}개의 응답을 삭제하시겠습니까?`)) {
+      return
+    }
+
+    setDeleting(true)
+    const result = await deleteMultipleResponses(Array.from(selectedResponses))
+
+    if (result.error) {
+      alert(`삭제 실패: ${result.error}`)
+    } else {
+      // 낙관적 UI 업데이트
+      setResponses((prev) => prev.filter((r) => !selectedResponses.has(r.id)))
+      setSelectedResponses(new Set())
+    }
+    setDeleting(false)
+  }
 
   const calculateStatistics = (sectionId: string, questionId: string) => {
     const values = responses
@@ -188,6 +253,16 @@ export default function SurveyResultsPage() {
             <p className="mt-1 text-sm text-gray-600">설문 결과</p>
           </div>
           <div className="flex gap-2">
+            {selectedResponses.size > 0 && (
+              <button
+                onClick={handleDeleteSelected}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 size={16} />
+                선택 삭제 ({selectedResponses.size})
+              </button>
+            )}
             <button
               onClick={exportToExcel}
               disabled={responses.length === 0}
@@ -232,6 +307,14 @@ export default function SurveyResultsPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead>
                   <tr>
+                    <th className="px-4 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={responses.length > 0 && selectedResponses.size === responses.length}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       번호
                     </th>
@@ -243,11 +326,22 @@ export default function SurveyResultsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       제출일시
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      작업
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {responses.map((response, index) => (
                     <tr key={response.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedResponses.has(response.id)}
+                          onChange={() => handleSelectOne(response.id)}
+                          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
                       {survey.basic_info_questions?.map((question) => (
                         <td key={question.id} className="px-4 py-3 text-sm text-gray-900">
@@ -256,6 +350,16 @@ export default function SurveyResultsPage() {
                       ))}
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {new Date(response.created_at).toLocaleString('ko-KR')}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleDeleteOne(response.id)}
+                          disabled={deleting}
+                          className="text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="삭제"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </td>
                     </tr>
                   ))}
