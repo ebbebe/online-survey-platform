@@ -67,10 +67,12 @@ ResponseRow.displayName = 'ResponseRow'
 // 차트 컴포넌트 (메모이제이션)
 const QuestionChart = memo(({
   stats,
-  questionText
+  questionText,
+  isReverseCoded
 }: {
   stats: { average: number; distribution: number[]; count: number }
   questionText: string
+  isReverseCoded?: boolean
 }) => {
   const totalResponses = stats.count
 
@@ -105,12 +107,20 @@ const QuestionChart = memo(({
   return (
     <div className="border-b border-gray-200 pb-6 last:border-b-0">
       <div className="mb-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-2">
+        <h3 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
           {questionText}
+          {isReverseCoded && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+              역
+            </span>
+          )}
         </h3>
         <p className="text-sm text-gray-600">
           평균: <span className="font-bold text-indigo-600">{stats.average}</span>점
           (총 {stats.count}명 응답)
+          {isReverseCoded && (
+            <span className="ml-2 text-xs text-purple-600">(역문항: 점수 반전 적용됨)</span>
+          )}
         </p>
       </div>
 
@@ -327,8 +337,14 @@ export default function SurveyResultsPage() {
 
       survey.sections.forEach((section) => {
         section.questions.forEach((question) => {
-          row[`${section.title} - ${question.text}`] =
-            response.section_answers[section.id]?.[question.id] || ''
+          const score = response.section_answers[section.id]?.[question.id] || ''
+
+          // 역문항 표시 추가
+          const questionLabel = question.isReverseCoded
+            ? `${section.title} - ${question.text} (역)`
+            : `${section.title} - ${question.text}`
+
+          row[questionLabel] = score
         })
       })
 
@@ -360,8 +376,14 @@ export default function SurveyResultsPage() {
 
       survey.sections.forEach((section) => {
         section.questions.forEach((question) => {
-          row[`${section.title} - ${question.text}`] =
-            response.section_answers[section.id]?.[question.id] || ''
+          const score = response.section_answers[section.id]?.[question.id] || ''
+
+          // 역문항 표시 추가
+          const questionLabel = question.isReverseCoded
+            ? `${section.title} - ${question.text} (역)`
+            : `${section.title} - ${question.text}`
+
+          row[questionLabel] = score
         })
       })
 
@@ -517,6 +539,7 @@ export default function SurveyResultsPage() {
                       key={question.id}
                       stats={stats}
                       questionText={question.text}
+                      isReverseCoded={question.isReverseCoded}
                     />
                   )
                 })}

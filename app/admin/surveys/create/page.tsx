@@ -195,6 +195,23 @@ export default function CreateSurveyPage() {
     )
   }
 
+  const toggleReverseCoded = (sectionId: string, questionId: string) => {
+    setSections(
+      sections.map((s) =>
+        s.id === sectionId
+          ? {
+              ...s,
+              questions: s.questions.map((q) =>
+                q.id === questionId
+                  ? { ...q, isReverseCoded: !q.isReverseCoded }
+                  : q
+              ),
+            }
+          : s
+      )
+    )
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -545,34 +562,58 @@ export default function CreateSurveyPage() {
                     문항 *
                   </label>
                   {section.questions.map((question, questionIndex) => (
-                    <div key={question.id} className="flex gap-2">
-                      <div className="flex-shrink-0 w-8 pt-2 text-sm text-gray-500">
-                        {questionIndex + 1}.
-                      </div>
-                      <input
-                        type="text"
-                        value={question.text}
-                        onChange={(e) =>
-                          updateQuestion(
-                            section.id,
-                            question.id,
-                            e.target.value
-                          )
-                        }
-                        className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                        placeholder="문항 내용을 입력하세요"
-                      />
-                      {section.questions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            removeQuestion(section.id, question.id)
+                    <div key={question.id} className="space-y-2">
+                      <div className="flex gap-2">
+                        <div className="flex-shrink-0 w-8 pt-2 text-sm text-gray-500">
+                          {questionIndex + 1}.
+                        </div>
+                        <input
+                          type="text"
+                          value={question.text}
+                          onChange={(e) =>
+                            updateQuestion(
+                              section.id,
+                              question.id,
+                              e.target.value
+                            )
                           }
-                          className="flex-shrink-0 text-red-600 hover:text-red-800"
+                          className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                          placeholder="문항 내용을 입력하세요"
+                        />
+                        {section.questions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeQuestion(section.id, question.id)
+                            }
+                            className="flex-shrink-0 text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center ml-8">
+                        <input
+                          type="checkbox"
+                          id={`reverse-${question.id}`}
+                          checked={question.isReverseCoded || false}
+                          onChange={() =>
+                            toggleReverseCoded(section.id, question.id)
+                          }
+                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        />
+                        <label
+                          htmlFor={`reverse-${question.id}`}
+                          className="ml-2 text-sm text-gray-700"
                         >
-                          <Trash2 size={20} />
-                        </button>
-                      )}
+                          역문항 (점수 반전)
+                          {question.isReverseCoded && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                              역
+                            </span>
+                          )}
+                        </label>
+                      </div>
                     </div>
                   ))}
                   <button

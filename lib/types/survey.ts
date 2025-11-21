@@ -3,6 +3,7 @@
 export interface SurveyQuestion {
   id: string
   text: string
+  isReverseCoded?: boolean // 역문항 여부
 }
 
 export interface SurveySection {
