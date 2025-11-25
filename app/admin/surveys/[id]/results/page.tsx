@@ -345,7 +345,7 @@ export default function SurveyResultsPage() {
           let score = response.section_answers[section.id]?.[question.id] || ''
 
           // 역문항이면 점수를 역변환하여 표시
-          if (score && question.isReverseCoded) {
+          if (typeof score === 'number' && question.isReverseCoded) {
             score = 6 - score
           }
 
@@ -389,7 +389,7 @@ export default function SurveyResultsPage() {
           let score = response.section_answers[section.id]?.[question.id] || ''
 
           // 역문항이면 점수를 역변환하여 표시
-          if (score && question.isReverseCoded) {
+          if (typeof score === 'number' && question.isReverseCoded) {
             score = 6 - score
           }
 
