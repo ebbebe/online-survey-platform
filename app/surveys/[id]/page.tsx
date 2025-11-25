@@ -136,20 +136,23 @@ export default function SurveyResponsePage() {
     return () => document.removeEventListener('keydown', handleEscape)
   }, [showLimitModal, isClosing])
 
-  const updateAnswer = (sectionId: string, questionId: string, displayValue: number, isReverseCoded?: boolean) => {
+  const updateAnswer = (sectionId: string, questionId: string, score: number, isReverseCoded?: boolean) => {
     const section = survey?.sections.find((s) => s.id === sectionId)
     if (!section) return
 
     const currentAnswers = sectionAnswers[sectionId] || {}
     const oldValue = currentAnswers[questionId] || 0
 
-    // 역문항이면 저장할 값을 반전 (표시 1점 → DB 5점, 표시 5점 → DB 1점)
-    const actualValue = isReverseCoded ? 6 - displayValue : displayValue
+    // 화면 값 그대로 DB에 저장
+    const dbValue = score
 
-    // 1점 제약 체크 (실제 저장 값 기준)
-    const onePointCount = Object.values(currentAnswers).filter((v) => v === 1).length
-    if (actualValue === 1 && oldValue !== 1) {
-      const maxOnePoints = section.max_one_points ?? 3 // fallback for existing surveys
+    // 현재 섹션의 값들 (DB값 = 화면값)
+    const displayValues = Object.values(currentAnswers)
+
+    // 1점 제약 체크 (화면 값 기준)
+    const onePointCount = displayValues.filter((v) => v === 1).length
+    if (score === 1 && oldValue !== 1) {
+      const maxOnePoints = section.max_one_points ?? 3
       if (maxOnePoints > 0 && onePointCount >= maxOnePoints) {
         setLimitModalMessage(`1점은 최대 ${maxOnePoints}개까지만 선택 가능합니다`)
         setShowLimitModal(true)
@@ -157,10 +160,10 @@ export default function SurveyResponsePage() {
       }
     }
 
-    // 5점 제약 체크 (실제 저장 값 기준)
-    const fivePointCount = Object.values(currentAnswers).filter((v) => v === 5).length
-    if (actualValue === 5 && oldValue !== 5) {
-      const maxFivePoints = section.max_five_points ?? 3 // fallback for existing surveys
+    // 5점 제약 체크 (화면 값 기준)
+    const fivePointCount = displayValues.filter((v) => v === 5).length
+    if (score === 5 && oldValue !== 5) {
+      const maxFivePoints = section.max_five_points ?? 3
       if (maxFivePoints > 0 && fivePointCount >= maxFivePoints) {
         setLimitModalMessage(`5점은 최대 ${maxFivePoints}개까지만 선택 가능합니다`)
         setShowLimitModal(true)
@@ -172,7 +175,7 @@ export default function SurveyResponsePage() {
       ...sectionAnswers,
       [sectionId]: {
         ...currentAnswers,
-        [questionId]: actualValue, // 반전된 값 또는 원래 값 저장
+        [questionId]: dbValue,
       },
     })
   }
@@ -334,12 +337,13 @@ export default function SurveyResponsePage() {
 
           {/* 척도 문항 섹션 */}
           {survey.sections.map((section, sectionIndex) => {
-            const onePointCount = Object.values(sectionAnswers[section.id] || {}).filter(
-              (v) => v === 1
-            ).length
-            const fivePointCount = Object.values(sectionAnswers[section.id] || {}).filter(
-              (v) => v === 5
-            ).length
+            const currentAnswers = sectionAnswers[section.id] || {}
+
+            // DB값 = 화면값이므로 그대로 사용
+            const displayValues = Object.values(currentAnswers)
+
+            const onePointCount = displayValues.filter((v) => v === 1).length
+            const fivePointCount = displayValues.filter((v) => v === 5).length
 
             const maxOnePoints = section.max_one_points ?? 3
             const maxFivePoints = section.max_five_points ?? 3
@@ -370,11 +374,8 @@ export default function SurveyResponsePage() {
 
                 <div className="space-y-6">
                   {section.questions.map((question, questionIndex) => {
-                    const actualValue = sectionAnswers[section.id]?.[question.id] || 0
-                    // 역문항이면 표시할 값을 역변환 (DB 5점 → 화면 1점 표시)
-                    const displayValue = question.isReverseCoded && actualValue > 0
-                      ? 6 - actualValue
-                      : actualValue
+                    // DB에 화면값 그대로 저장하므로 역변환 불필요
+                    const displayValue = sectionAnswers[section.id]?.[question.id] || 0
 
                     return (
                       <div key={question.id} className="pb-4 border-b border-gray-200 last:border-b-0">
@@ -382,22 +383,13 @@ export default function SurveyResponsePage() {
                           {questionIndex + 1}. {question.text} *
                         </p>
                         <div className="space-y-2">
-                          {(question.isReverseCoded
-                            ? [
-                                { score: 1, label: '항상 그렇다' },
-                                { score: 2, label: '그런 편이다' },
-                                { score: 3, label: '가끔 그렇다' },
-                                { score: 4, label: '드물다' },
-                                { score: 5, label: '전혀 그렇지 않다' }
-                              ]
-                            : [
-                                { score: 5, label: '항상 그렇다' },
-                                { score: 4, label: '그런 편이다' },
-                                { score: 3, label: '가끔 그렇다' },
-                                { score: 2, label: '드물다' },
-                                { score: 1, label: '전혀 그렇지 않다' }
-                              ]
-                          ).map(({ score, label }) => (
+                          {[
+                            { score: 5, label: '항상 그렇다' },
+                            { score: 4, label: '그런 편이다' },
+                            { score: 3, label: '가끔 그렇다' },
+                            { score: 2, label: '드물다' },
+                            { score: 1, label: '전혀 그렇지 않다' }
+                          ].map(({ score, label }) => (
                             <button
                               key={score}
                               type="button"

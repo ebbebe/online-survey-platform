@@ -289,8 +289,8 @@ export default function SurveyResultsPage() {
   }, [selectedResponses])
 
   // 통계 계산 캐싱
-  const calculateStatistics = useCallback((sectionId: string, questionId: string) => {
-    const values = responses
+  const calculateStatistics = useCallback((sectionId: string, questionId: string, isReverseCoded?: boolean) => {
+    let values = responses
       .map((r) => r.section_answers[sectionId]?.[questionId])
       .filter((v) => v !== undefined && v !== null && v > 0)
 
@@ -300,6 +300,11 @@ export default function SurveyResultsPage() {
         distribution: [0, 0, 0, 0, 0],
         count: 0,
       }
+    }
+
+    // 역문항이면 점수를 역변환 (DB 저장값 → 표시값)
+    if (isReverseCoded) {
+      values = values.map(v => 6 - v)
     }
 
     const sum = values.reduce((acc, val) => acc + val, 0)
@@ -337,7 +342,12 @@ export default function SurveyResultsPage() {
 
       survey.sections.forEach((section) => {
         section.questions.forEach((question) => {
-          const score = response.section_answers[section.id]?.[question.id] || ''
+          let score = response.section_answers[section.id]?.[question.id] || ''
+
+          // 역문항이면 점수를 역변환하여 표시
+          if (score && question.isReverseCoded) {
+            score = 6 - score
+          }
 
           // 역문항 표시 추가
           const questionLabel = question.isReverseCoded
@@ -376,7 +386,12 @@ export default function SurveyResultsPage() {
 
       survey.sections.forEach((section) => {
         section.questions.forEach((question) => {
-          const score = response.section_answers[section.id]?.[question.id] || ''
+          let score = response.section_answers[section.id]?.[question.id] || ''
+
+          // 역문항이면 점수를 역변환하여 표시
+          if (score && question.isReverseCoded) {
+            score = 6 - score
+          }
 
           // 역문항 표시 추가
           const questionLabel = question.isReverseCoded
@@ -533,7 +548,7 @@ export default function SurveyResultsPage() {
               <h2 className="text-lg font-bold text-gray-900 mb-4">{section.title}</h2>
               <div className="space-y-8">
                 {section.questions.map((question) => {
-                  const stats = calculateStatistics(section.id, question.id)
+                  const stats = calculateStatistics(section.id, question.id, question.isReverseCoded)
                   return (
                     <QuestionChart
                       key={question.id}
