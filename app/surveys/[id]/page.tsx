@@ -383,27 +383,26 @@ export default function SurveyResponsePage() {
                           {questionIndex + 1}. {question.text} *
                         </p>
                         <div className="space-y-2">
-                          {[
-                            { score: 5, label: '항상 그렇다' },
-                            { score: 4, label: '그런 편이다' },
-                            { score: 3, label: '가끔 그렇다' },
-                            { score: 2, label: '드물다' },
-                            { score: 1, label: '전혀 그렇지 않다' }
-                          ].map(({ score, label }) => (
-                            <button
-                              key={score}
-                              type="button"
-                              onClick={() => updateAnswer(section.id, question.id, score, question.isReverseCoded)}
-                              className={`w-full p-3 rounded-lg border-2 transition-all flex items-center justify-between ${
-                                displayValue === score
-                                  ? 'bg-indigo-100 border-indigo-500 text-indigo-900'
-                                  : 'bg-white border-gray-300 text-gray-700 hover:border-indigo-400'
-                              }`}
-                            >
-                              <span className="text-sm">{label}</span>
-                              <span className="text-xl font-bold">{score}</span>
-                            </button>
-                          ))}
+                          <div className="flex justify-between text-xs text-gray-600 px-1">
+                            <span>전혀 그렇지 않다</span>
+                            <span>항상 그렇다</span>
+                          </div>
+                          <div className="flex gap-3">
+                            {[1, 2, 3, 4, 5].map((score) => (
+                              <button
+                                key={score}
+                                type="button"
+                                onClick={() => updateAnswer(section.id, question.id, score, question.isReverseCoded)}
+                                className={`flex-1 h-12 rounded-md border transition-all font-bold text-xl active:scale-95 ${
+                                  displayValue === score
+                                    ? 'bg-indigo-500 border-indigo-500 text-white shadow-md'
+                                    : 'bg-gray-50 border-gray-300 text-gray-700 hover:border-indigo-400 hover:shadow-md'
+                                }`}
+                              >
+                                {score}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )
